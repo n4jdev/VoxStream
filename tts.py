@@ -30,12 +30,6 @@ headers = {
     "authorization": "Bearer dc22c6f09ef2fa3d96a53b589ecc2b5a644db8fb24bbd21dac77370017fb792208e358d5df25bb1f2669304fb7bbd5f3f08119079044421acf8e0663667a573f03606155273cb02a2a62d9b310a5c2d49fef56b45c59ed6f4e06cc0b31e91f1ba96f364ab6f350ef30d3c4c7e88c09b44ed889ee2e3b09646c7855c3f43272d82a13ff0bbbd5a88b54dc312f60bfaa3a9931e10a47b4cbb8b4be78c687757ee6855d030f836622b9dc8e062dcccaa9601a96c52fe3528be876ed6ed4bc193e1448e96518569bcf98e509df22effed1ed1a405c29438fb3af307281d8416f84146244d7e9b8f58f5af35f6c5b8ee1c2ef5f3e271ec49849704b6d0272f3f709e550db9c3c158f3f18851a9d4cab008c87eac57c04f3d9d899ced500998d0d61e35b691642",
     "origin": "https://openaitexttospeechdemo.bubbleapps.io",
     "referer": "https://openaitexttospeechdemo.bubbleapps.io/",
-    "sec-ch-ua": '"Not-A.Brand";v="99", "Chromium";v="124"',
-    "sec-ch-ua-mobile": "?1",
-    "sec-ch-ua-platform": '"Android"',
-    "sec-fetch-dest": "empty",
-    "sec-fetch-mode": "cors",
-    "sec-fetch-site": "cross-site",
 }
 
 def stream_audio(text):
@@ -48,44 +42,44 @@ def stream_audio(text):
         "speed": speed
     }
     
-    with requests.post(API_URL, headers=headers, json=payload, stream=True) as response:
-        if response.status_code == 200:
-            return response.iter_content(chunk_size=4096)
-        else:
-            st.error(f"Error: {response.status_code} - {response.text}")
-            return None
+    try:
+        response = requests.post(API_URL, headers=headers, json=payload, stream=True)
+        response.raise_for_status()
+        return response.iter_content(chunk_size=4096)
+    except requests.RequestException as e:
+        st.error(f"Error: {str(e)}")
+        return None
+
+# Always display the audio player
+audio_player = st.empty()
+audio_player.audio("data:audio/mp3;base64,", format="audio/mp3")
 
 # Generate button
 if st.button("Generate Speech"):
     if text_input:
-        # Create a placeholder for the audio player
-        audio_placeholder = st.empty()
-        
         # Create a status message
         status = st.empty()
         
-        # Initialize an empty byte string to store the audio data
-        audio_data = b""
-        
         # Stream the audio
-        chunks = stream_audio(text_input)
+        audio_stream = stream_audio(text_input)
         
-        if chunks:
+        if audio_stream:
+            audio_data = b""
             start_time = time.time()
-            for i, chunk in enumerate(chunks):
-                if chunk:
-                    audio_data += chunk
-                    
-                    # Update the audio player with the current data
-                    audio_base64 = base64.b64encode(audio_data).decode()
-                    audio_placeholder.markdown(f'<audio src="data:audio/mp3;base64,{audio_base64}" controls autoplay></audio>', unsafe_allow_html=True)
-                    
-                    # Update status message
-                    elapsed_time = time.time() - start_time
-                    status.text(f"Streaming audio... {elapsed_time:.2f} seconds")
-                    
-                    # Add a small delay to allow for smoother updates
-                    time.sleep(0.1)
+            
+            for chunk in audio_stream:
+                audio_data += chunk
+                
+                # Update the audio player with the current data
+                audio_base64 = base64.b64encode(audio_data).decode()
+                audio_player.audio(f"data:audio/mp3;base64,{audio_base64}", format="audio/mp3")
+                
+                # Update status message
+                elapsed_time = time.time() - start_time
+                status.text(f"Streaming audio... {elapsed_time:.2f} seconds")
+                
+                # Add a small delay to allow for smoother updates
+                time.sleep(0.1)
             
             # Final update
             status.text(f"Audio generation complete. Total time: {time.time() - start_time:.2f} seconds")
