@@ -2,9 +2,11 @@ import streamlit as st
 import requests
 import base64
 import time
+import io
+from audio_effects import apply_audio_effects
 
 # Streamlit app title
-st.title("StreamSpeak: Real-time TTS App")
+st.title("StreamSpeak: Real-time TTS App with Audio Effects")
 
 # Text input
 text_input = st.text_area("Enter text to convert to speech:", "Hello, welcome to StreamSpeak!")
@@ -14,6 +16,9 @@ voice = st.selectbox("Select voice:", ["alloy", "echo", "fable", "onyx", "nova",
 
 # Speed slider
 speed = st.slider("Speech speed:", min_value=0.5, max_value=2.0, value=1.0, step=0.1)
+
+# Audio effects toggle
+apply_effects = st.checkbox("Apply human-like microphone effects")
 
 # API endpoint
 API_URL = "https://europe-west3-bubble-io-284016.cloudfunctions.net/get-stream"
@@ -61,13 +66,14 @@ if st.button("Generate Speech"):
             
             for chunk in audio_stream:
                 audio_data += chunk
-                
-                # Update the audio player with the current data
-                audio_base64 = base64.b64encode(audio_data).decode()
-                audio_player.audio(f"data:audio/mp3;base64,{audio_base64}", format="audio/mp3")
-                
-                # Add a small delay to allow for smoother updates
-                time.sleep(0.1)
+            
+            if apply_effects:
+                # Apply audio effects
+                audio_data = apply_audio_effects(audio_data)
+            
+            # Update the audio player with the final data
+            audio_base64 = base64.b64encode(audio_data).decode()
+            audio_player.audio(f"data:audio/mp3;base64,{audio_base64}", format="audio/mp3")
             
             # Provide download link
             st.download_button(
@@ -81,4 +87,4 @@ if st.button("Generate Speech"):
 
 # Footer
 st.markdown("---")
-st.markdown("StreamSpeak - Powered by Streamlit and Custom TTS API")
+st.markdown("StreamSpeak - Powered by Streamlit and Custom TTS API with Audio Effects")
