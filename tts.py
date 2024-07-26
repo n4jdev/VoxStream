@@ -1,7 +1,6 @@
 import streamlit as st
 import requests
 import base64
-import time
 import io
 from pydub import AudioSegment
 from pydub.generators import WhiteNoise
@@ -11,7 +10,7 @@ import random
 st.title("StreamSpeak: Real-time TTS App")
 
 # Text input
-text_input = st.text_area("Enter text to convert to speech:", "Hello, welcome to StreamSpeak!")
+text_input = st.text_area("Enter text to convert to speech:", "Hello, my name is Kayla, I'm one of the voices that you can use to speech enable your website. When I'm reading your text it sounds like this.")
 
 # Voice selection
 voice = st.selectbox("Select voice:", ["alloy", "echo", "fable", "onyx", "nova", "shimmer"])
@@ -45,7 +44,7 @@ def stream_audio(text):
     try:
         response = requests.post(API_URL, headers=headers, json=payload, stream=True)
         response.raise_for_status()
-        return response.iter_content(chunk_size=4096)
+        return response.content
     except requests.RequestException as e:
         st.error(f"Error: {str(e)}")
         return None
@@ -75,31 +74,23 @@ audio_player.audio("data:audio/mp3;base64,", format="audio/mp3")
 if st.button("Generate Speech"):
     if text_input:
         # Stream the audio
-        audio_stream = stream_audio(text_input)
+        audio_data = stream_audio(text_input)
         
-        if audio_stream:
-            audio_data = b""
+        if audio_data:
+            # Process the audio data
+            audio_segment = AudioSegment.from_mp3(io.BytesIO(audio_data))
+            processed_audio = add_human_like_effects(audio_segment)
             
-            for chunk in audio_stream:
-                audio_data += chunk
-                
-                # Process the audio data
-                audio_segment = AudioSegment.from_mp3(io.BytesIO(audio_data))
-                processed_audio = add_human_like_effects(audio_segment)
-                
-                # Convert back to bytes
-                buffer = io.BytesIO()
-                processed_audio.export(buffer, format="mp3")
-                processed_audio_data = buffer.getvalue()
-                
-                # Update the audio player with the processed data
-                audio_base64 = base64.b64encode(processed_audio_data).decode()
-                audio_player.audio(f"data:audio/mp3;base64,{audio_base64}", format="audio/mp3")
-                
-                # Add a small delay to allow for smoother updates
-                time.sleep(0.1)
+            # Convert back to bytes
+            buffer = io.BytesIO()
+            processed_audio.export(buffer, format="mp3")
+            processed_audio_data = buffer.getvalue()
             
-            # Provide download link for the final processed audio
+            # Update the audio player with the processed data
+            audio_base64 = base64.b64encode(processed_audio_data).decode()
+            audio_player.audio(f"data:audio/mp3;base64,{audio_base64}", format="audio/mp3")
+            
+            # Provide download link for the processed audio
             st.download_button(
                 label="Download Audio",
                 data=processed_audio_data,
