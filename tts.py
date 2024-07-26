@@ -2,8 +2,10 @@ import streamlit as st
 import requests
 import base64
 import time
+import json
 
 # Streamlit app title
+st.set_page_config(page_title="StreamSpeak: Real-time TTS App", page_icon="🎙️")
 st.title("StreamSpeak: Real-time TTS App")
 
 # Text input
@@ -84,7 +86,8 @@ if st.button("Generate Speech"):
                 st.session_state.audio_data += chunk
                 
                 # Update the audio player with the current data
-                update_audio_player()
+                audio_base64 = base64.b64encode(st.session_state.audio_data).decode()
+                st.session_state.current_audio_data = audio_base64
                 
                 # Update status message
                 elapsed_time = time.time() - start_time
@@ -104,11 +107,36 @@ if st.button("Generate Speech"):
                 mime="audio/mp3"
             )
             
-            # Add JavaScript to start playing the audio
+            # Update the audio player one last time
+            update_audio_player()
+            
+            # Add JavaScript to start playing the audio and handle updates
             st.markdown("""
                 <script>
                     const audioPlayer = document.getElementById('audio-player');
-                    audioPlayer.play();
+                    
+                    function updateAudioSource(base64Data) {
+                        const currentTime = audioPlayer.currentTime;
+                        const wasPlaying = !audioPlayer.paused;
+                        audioPlayer.src = `data:audio/mp3;base64,${base64Data}`;
+                        audioPlayer.load();
+                        audioPlayer.currentTime = currentTime;
+                        if (wasPlaying) {
+                            audioPlayer.play();
+                        }
+                    }
+                    
+                    function checkForUpdates() {
+                        fetch('_stcore/stream')
+                            .then(response => response.json())
+                            .then(data => {
+                                if (data.current_audio_data) {
+                                    updateAudioSource(data.current_audio_data);
+                                }
+                            });
+                    }
+                    
+                    setInterval(checkForUpdates, 1000);
                 </script>
             """, unsafe_allow_html=True)
     else:
