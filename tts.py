@@ -2,6 +2,7 @@ import streamlit as st
 import requests
 import json
 import time
+import io
 
 def stream_audio(url, headers, data):
     with requests.post(url, headers=headers, data=json.dumps(data), stream=True) as response:
@@ -42,13 +43,20 @@ if st.button("Generate Audio"):
     audio_placeholder = st.empty()
     status_placeholder = st.empty()
 
+    # Create a BytesIO object to store the audio data
+    audio_buffer = io.BytesIO()
+
+    # Display the audio player immediately
+    audio_player = audio_placeholder.audio(audio_buffer, format="audio/mpeg", start_time=0)
+
     status_placeholder.text("Generating audio...")
-    audio_data = b""
     for chunk in stream_audio(url, headers, data):
-        audio_data += chunk
-        status_placeholder.text(f"Received {len(audio_data)} bytes...")
+        audio_buffer.write(chunk)
+        # Update the audio player with the new data
+        audio_player.audio(audio_buffer, format="audio/mpeg", start_time=0)
+        status_placeholder.text(f"Received {audio_buffer.tell()} bytes...")
+        time.sleep(0.1)  # Small delay to allow for smoother updates
 
     status_placeholder.text("Audio generation complete!")
-    audio_placeholder.audio(audio_data, format="audio/mpeg", start_time=0)
 
-st.write("Note: This app streams the audio response from the ElevenLabs API.")
+st.write("Note: This app streams the audio response from the ElevenLabs API in real-time.")
