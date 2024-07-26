@@ -1,14 +1,8 @@
 import streamlit as st
 import requests
-import io
-from pydub import AudioSegment
-from pydub.playback import play
 import base64
 import os
-from dotenv import load_dotenv
-
-# Load environment variables
-load_dotenv()
+import hashlib
 
 # ElevenLabs API endpoint
 API_URL = "https://chatin2.vercel.app/api/elevenlabs"
@@ -26,7 +20,21 @@ VOICES = {
     "Sam": "yoZ06aMxZJJ28mfd3POQ"
 }
 
+# Cache directory
+CACHE_DIR = "voice_cache"
+os.makedirs(CACHE_DIR, exist_ok=True)
+
+@st.cache_data
 def text_to_speech(text, voice_id):
+    # Generate a unique cache key based on the text and voice_id
+    cache_key = hashlib.md5(f"{text}:{voice_id}".encode()).hexdigest()
+    cache_file = os.path.join(CACHE_DIR, f"{cache_key}.mp3")
+
+    # Check if the audio is already cached
+    if os.path.exists(cache_file):
+        with open(cache_file, "rb") as f:
+            return f.read()
+
     headers = {
         'User-Agent': 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36',
         'authority': 'chatin2.vercel.app',
@@ -53,6 +61,9 @@ def text_to_speech(text, voice_id):
     response = requests.post(API_URL, headers=headers, json=data)
     
     if response.status_code == 200:
+        # Cache the audio file
+        with open(cache_file, "wb") as f:
+            f.write(response.content)
         return response.content
     else:
         st.error(f"Error: {response.status_code} - {response.text}")
@@ -64,29 +75,60 @@ def get_binary_file_downloader_html(bin_file, file_label='File'):
     return href
 
 def main():
-    st.set_page_config(page_title="VoxStream: Text-to-Speech Converter", page_icon="🎙️")
+    st.set_page_config(page_title="VoxStream: Text-to-Speech Converter", page_icon="🎙️", layout="wide")
     
     st.title("VoxStream: Text-to-Speech Converter")
     st.write("Convert your text to speech using ElevenLabs API")
 
-    text_input = st.text_area("Enter the text you want to convert to speech:", height=150)
-    voice = st.selectbox("Select a voice:", list(VOICES.keys()))
+    col1, col2 = st.columns([2, 1])
 
-    if st.button("Generate Speech"):
-        if text_input.strip() == "":
-            st.warning("Please enter some text to convert.")
+    with col1:
+        text_input = st.text_area("Enter the text you want to convert to speech:", height=150)
+        char_count = len(text_input)
+        st.write(f"Character count: {char_count}")
+
+        use_custom_voice = st.checkbox("Use Custom Voice")
+        if use_custom_voice:
+            voice_id = st.text_input("Enter Custom Voice ID:")
         else:
-            with st.spinner("Generating speech..."):
-                audio_content = text_to_speech(text_input, VOICES[voice])
-                
-                if audio_content:
-                    st.success("Speech generated successfully!")
+            voice = st.selectbox("Select a voice:", list(VOICES.keys()))
+            voice_id = VOICES[voice]
+
+        if st.button("Generate Speech"):
+            if text_input.strip() == "":
+                st.warning("Please enter some text to convert.")
+            else:
+                with st.spinner("Generating speech..."):
+                    audio_content = text_to_speech(text_input, voice_id)
                     
-                    # Play audio
-                    st.audio(audio_content, format="audio/mp3")
-                    
-                    # Download button
-                    st.markdown(get_binary_file_downloader_html(audio_content, f"VoxStream_{voice}"), unsafe_allow_html=True)
+                    if audio_content:
+                        st.success("Speech generated successfully!")
+                        
+                        # Play audio
+                        st.audio(audio_content, format="audio/mp3")
+                        
+                        # Download button
+                        st.markdown(get_binary_file_downloader_html(audio_content, f"VoxStream_audio"), unsafe_allow_html=True)
+
+    with col2:
+        st.subheader("About Custom Voices")
+        st.write("""
+        To use a custom voice:
+        1. Check the "Use Custom Voice" box
+        2. Enter your custom voice ID
+        3. Generate speech as usual
+        
+        You can obtain custom voice IDs from your ElevenLabs account.
+        """)
+
+    # Display cache info
+    st.sidebar.title("Cache Information")
+    cache_size = sum(os.path.getsize(os.path.join(CACHE_DIR, f)) for f in os.listdir(CACHE_DIR))
+    st.sidebar.write(f"Cache size: {cache_size / 1024 / 1024:.2f} MB")
+    if st.sidebar.button("Clear Cache"):
+        for file in os.listdir(CACHE_DIR):
+            os.remove(os.path.join(CACHE_DIR, file))
+        st.sidebar.success("Cache cleared successfully!")
 
 if __name__ == "__main__":
     main()
