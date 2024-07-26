@@ -70,9 +70,9 @@ if st.button("Generate Speech"):
                 audio_base64 = base64.b64encode(audio_data).decode()
                 audio_player.audio(f"data:audio/mp3;base64,{audio_base64}", format="audio/mp3")
                 
-                # Update status message
+                # Update status message (removed "Streaming audio..." text)
                 elapsed_time = time.time() - start_time
-                status.text(f"Streaming audio... {elapsed_time:.2f} seconds")
+                status.text(f"{elapsed_time:.2f} seconds")
                 
                 # Add a small delay to allow for smoother updates
                 time.sleep(0.1)
