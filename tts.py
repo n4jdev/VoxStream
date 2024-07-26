@@ -46,23 +46,28 @@ def get_chat_response(text):
         "conversation": "14KD7b4aR8HAxnpbFJB6s"
     }
     
-    response = requests.post(CHAT_API_URL, headers=HEADERS, json=data, stream=True)
-    client = SSEClient(response)
-    
-    received_sid = None
-    message_sid = None
-    response_text = ""
-    
-    for event in client.events():
-        if event.event == 'received':
-            received_sid = event.data['sid']
-        elif event.event == 'message':
-            message_sid = event.data['sid']
-        elif event.event == 'partial':
-            response_text = event.data['text']
-            break
-    
-    return response_text, received_sid, message_sid
+    try:
+        response = requests.post(CHAT_API_URL, headers=HEADERS, json=data, stream=True)
+        response.raise_for_status()
+        client = SSEClient(response)
+        
+        received_sid = None
+        message_sid = None
+        response_text = ""
+        
+        for event in client.events():
+            if event.event == 'received':
+                received_sid = event.data['sid']
+            elif event.event == 'message':
+                message_sid = event.data['sid']
+            elif event.event == 'partial':
+                response_text = event.data['text']
+                break
+        
+        return response_text, received_sid, message_sid
+    except requests.exceptions.RequestException as e:
+        st.error(f"An error occurred while communicating with the Pi AI chat API: {str(e)}")
+        return None, None, None
 
 def get_voice_audio(message_sid, voice="voice8"):
     params = {
@@ -71,12 +76,12 @@ def get_voice_audio(message_sid, voice="voice8"):
         "messageSid": message_sid
     }
     
-    response = requests.get(VOICE_API_URL, headers=VOICE_HEADERS, params=params)
-    
-    if response.status_code == 200:
+    try:
+        response = requests.get(VOICE_API_URL, headers=VOICE_HEADERS, params=params)
+        response.raise_for_status()
         return io.BytesIO(response.content)
-    else:
-        st.error(f"Failed to get voice audio. Status code: {response.status_code}")
+    except requests.exceptions.RequestException as e:
+        st.error(f"Failed to get voice audio: {str(e)}")
         return None
 
 def main():
@@ -89,17 +94,22 @@ def main():
         if user_input:
             with st.spinner("Processing..."):
                 response_text, received_sid, message_sid = get_chat_response(user_input)
-                st.write(f"Pi AI response: {response_text}")
-                
-                st.write("Generating audio for 'received' event...")
-                received_audio = get_voice_audio(received_sid, voice_option)
-                if received_audio:
-                    st.audio(received_audio, format="audio/mp3")
-                
-                st.write("Generating audio for 'message' event...")
-                message_audio = get_voice_audio(message_sid, voice_option)
-                if message_audio:
-                    st.audio(message_audio, format="audio/mp3")
+                if response_text:
+                    st.write(f"Pi AI response: {response_text}")
+                    
+                    if received_sid:
+                        st.write("Generating audio for 'received' event...")
+                        received_audio = get_voice_audio(received_sid, voice_option)
+                        if received_audio:
+                            st.audio(received_audio, format="audio/mp3")
+                    
+                    if message_sid:
+                        st.write("Generating audio for 'message' event...")
+                        message_audio = get_voice_audio(message_sid, voice_option)
+                        if message_audio:
+                            st.audio(message_audio, format="audio/mp3")
+                else:
+                    st.error("Failed to get a response from Pi AI. Please try again later.")
         else:
             st.warning("Please enter some text.")
 
