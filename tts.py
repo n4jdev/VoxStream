@@ -5,7 +5,7 @@ from pydub import AudioSegment
 from pydub.playback import play
 
 # Streamlit app configuration
-st.set_page_config(page_title="StreamSpeak: TTS Audio Streamer", page_icon="🎙️")
+st.set_page_config(page_title="StreamSpeak: Instant TTS Audio Streamer", page_icon="🎙️")
 
 # Constants
 API_URL = "https://europe-west3-bubble-io-284016.cloudfunctions.net/get-stream"
@@ -19,10 +19,39 @@ def stream_audio(response):
     buffer.seek(0)
     return AudioSegment.from_mp3(buffer)
 
+# Function to generate and play audio
+def generate_and_play_audio(text, voice, language, speed):
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36",
+        "Content-Type": "application/json",
+        "authorization": f"Bearer {AUTH_TOKEN}",
+        "origin": "https://openaitexttospeechdemo.bubbleapps.io",
+        "referer": "https://openaitexttospeechdemo.bubbleapps.io/"
+    }
+    
+    payload = {
+        "model": "tts-1-hd",
+        "input": text,
+        "voice": voice,
+        "language": language,
+        "format": "mp3",
+        "speed": speed
+    }
+
+    try:
+        response = requests.post(API_URL, headers=headers, json=payload, stream=True)
+        response.raise_for_status()
+        
+        audio = stream_audio(response)
+        st.audio(audio.export(format="mp3").read(), format="audio/mp3", start_playing=True)
+        st.success("Audio generated and playing!")
+    except requests.RequestException as e:
+        st.error(f"An error occurred: {str(e)}")
+
 # Streamlit app
 def main():
-    st.title("StreamSpeak: TTS Audio Streamer")
-    st.write("Convert text to speech and listen in real-time!")
+    st.title("StreamSpeak: Instant TTS Audio Streamer")
+    st.write("Convert text to speech and listen instantly!")
 
     # Text input
     text_input = st.text_area("Enter the text you want to convert to speech:", height=150)
@@ -31,44 +60,16 @@ def main():
     voice_options = ["onyx", "alloy", "echo", "fable", "nova", "shimmer"]
     selected_voice = st.selectbox("Select a voice:", voice_options)
 
-    # Language selection (simplified for demo, can be expanded)
+    # Language selection
     language_options = ["en", "es", "fr", "de", "it", "pt", "pl", "tr", "ru", "nl", "cs", "ar", "zh", "ja", "ko", "tl"]
     selected_language = st.selectbox("Select a language:", language_options)
 
     # Speed selection
     speed = st.slider("Speech speed:", min_value=0.5, max_value=2.0, value=1.0, step=0.1)
 
-    if st.button("Generate Speech"):
-        if text_input:
-            # Prepare API request
-            headers = {
-                "User-Agent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36",
-                "Content-Type": "application/json",
-                "authorization": f"Bearer {AUTH_TOKEN}",
-                "origin": "https://openaitexttospeechdemo.bubbleapps.io",
-                "referer": "https://openaitexttospeechdemo.bubbleapps.io/"
-            }
-            
-            payload = {
-                "model": "tts-1-hd",
-                "input": text_input,
-                "voice": selected_voice,
-                "language": selected_language,
-                "format": "mp3",
-                "speed": speed
-            }
-
-            with st.spinner("Generating audio..."):
-                try:
-                    response = requests.post(API_URL, headers=headers, json=payload, stream=True)
-                    response.raise_for_status()
-                    
-                    # Stream and play audio
-                    audio = stream_audio(response)
-                    st.audio(audio.export(format="mp3").read(), format="audio/mp3")
-                    st.success("Audio generated successfully!")
-                except requests.RequestException as e:
-                    st.error(f"An error occurred: {str(e)}")
+    # Automatically generate and play audio when text is entered
+    if text_input:
+        generate_and_play_audio(text_input, selected_voice, selected_language, speed)
 
     st.markdown("---")
     st.write("Note: This application uses AI-generated voices. The audio you hear is not a human voice.")
