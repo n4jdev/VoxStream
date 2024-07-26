@@ -1,3 +1,4 @@
+scipy
 streamlit
 requests==2.28.2
 pydub==0.25.1
