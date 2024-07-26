@@ -50,12 +50,27 @@ def stream_audio(text):
         st.error(f"Error: {str(e)}")
         return None
 
-# Always display the audio player
+# Create a placeholder for the audio player
 audio_player = st.empty()
+
+# Initialize session state for audio data if it doesn't exist
+if 'audio_data' not in st.session_state:
+    st.session_state.audio_data = b""
+
+# Function to update audio player
+def update_audio_player():
+    audio_base64 = base64.b64encode(st.session_state.audio_data).decode()
+    audio_player.markdown(f'<audio id="audio-player" src="data:audio/mp3;base64,{audio_base64}" controls>Your browser does not support the audio element.</audio>', unsafe_allow_html=True)
+
+# Initial audio player (empty)
+update_audio_player()
 
 # Generate button
 if st.button("Generate Speech"):
     if text_input:
+        # Reset audio data
+        st.session_state.audio_data = b""
+        
         # Create a status message
         status = st.empty()
         
@@ -63,15 +78,13 @@ if st.button("Generate Speech"):
         audio_stream = stream_audio(text_input)
         
         if audio_stream:
-            audio_data = b""
             start_time = time.time()
             
             for chunk in audio_stream:
-                audio_data += chunk
+                st.session_state.audio_data += chunk
                 
-                # Update the audio player with the current data and autoplay
-                audio_base64 = base64.b64encode(audio_data).decode()
-                audio_player.markdown(f'<audio src="data:audio/mp3;base64,{audio_base64}" controls autoplay>Your browser does not support the audio element.</audio>', unsafe_allow_html=True)
+                # Update the audio player with the current data
+                update_audio_player()
                 
                 # Update status message
                 elapsed_time = time.time() - start_time
@@ -86,10 +99,18 @@ if st.button("Generate Speech"):
             # Provide download link
             st.download_button(
                 label="Download Audio",
-                data=audio_data,
+                data=st.session_state.audio_data,
                 file_name="generated_speech.mp3",
                 mime="audio/mp3"
             )
+            
+            # Add JavaScript to start playing the audio
+            st.markdown("""
+                <script>
+                    const audioPlayer = document.getElementById('audio-player');
+                    audioPlayer.play();
+                </script>
+            """, unsafe_allow_html=True)
     else:
         st.warning("Please enter some text to convert to speech.")
 
