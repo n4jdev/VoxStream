@@ -1,132 +1,54 @@
 import streamlit as st
-import subprocess
+import requests
 import json
 import time
-import os
-import requests
-import re
-import tempfile
 
-CONVERSATIONS_CURL = '''
-curl -X POST 'https://pi.ai/api/conversations' -H 'User-Agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36' -H 'Accept: application/json' -H 'Content-Type: application/json' -H 'authority: pi.ai' -H 'accept-language: en-PH,en-US;q=0.9,en;q=0.8' -H 'origin: https://pi.ai' -H 'referer: https://pi.ai/talk' -H 'sec-ch-ua: "Not-A.Brand";v="99", "Chromium";v="124"' -H 'sec-ch-ua-mobile: ?1' -H 'sec-ch-ua-platform: "Android"' -H 'sec-fetch-dest: empty' -H 'sec-fetch-mode: cors' -H 'sec-fetch-site: same-origin' -H 'Cookie: __Host-session=r98ovC1suEw22c6xmspsp; __cf_bm=28MnnefdTV23iLTtJaYJdxU6magLYb4zpDGyMKHrHvw-1721964119-1.0.1.1-upkx6n8USULq_B4mAxmjY2Y1fh40DkcftOZXoRwQTHh0Th4MtCGN0Jin02G7ALcqrnx3huEnpGbujKoW9ETsBw' -d '{}'
-'''
+def stream_audio(url, headers, data):
+    with requests.post(url, headers=headers, data=json.dumps(data), stream=True) as response:
+        response.raise_for_status()
+        for chunk in response.iter_content(chunk_size=4096):
+            if chunk:
+                yield chunk
 
-CHAT_CURL = '''
-curl -X POST 'https://pi.ai/api/chat' -H 'User-Agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36' -H 'Accept: text/event-stream' -H 'Content-Type: application/json' -H 'authority: pi.ai' -H 'accept-language: en-PH,en-US;q=0.9,en;q=0.8' -H 'origin: https://pi.ai' -H 'referer: https://pi.ai/talk' -H 'sec-ch-ua: "Not-A.Brand";v="99", "Chromium";v="124"' -H 'sec-ch-ua-mobile: ?1' -H 'sec-ch-ua-platform: "Android"' -H 'sec-fetch-dest: empty' -H 'sec-fetch-mode: cors' -H 'sec-fetch-site: same-origin' -H 'x-api-version: 3' -H 'Cookie: __Host-session=r98ovC1suEw22c6xmspsp; __cf_bm=BS95IS_QPeqiUILdVHjCIV6YCd9Fs31a5egMZN8X0U0-1721961318-1.0.1.1-aPtKE.13enODokRbrdjpE7f31q68G0reBI2vmzK6rpmlFZfpAVQ_nIJYUPme_VOhC0TYuz5zAm4M34l.Xz1XFQ' -d '{}'
-'''
+st.title("ElevenLabs Streaming Audio App")
 
-VOICE_CURL = '''
-curl -X GET 'https://pi.ai/api/chat/voice?mode=eager&voice=voice6&messageSid={}' -H 'User-Agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36' -H 'authority: pi.ai' -H 'accept-language: en-PH,en-US;q=0.9,en;q=0.8' -H 'range: bytes=0-' -H 'referer: https://pi.ai/talk' -H 'sec-ch-ua: "Not-A.Brand";v="99", "Chromium";v="124"' -H 'sec-ch-ua-mobile: ?1' -H 'sec-ch-ua-platform: "Android"' -H 'sec-fetch-dest: audio' -H 'sec-fetch-mode: no-cors' -H 'sec-fetch-site: same-origin' -H 'Cookie: __Host-session=r98ovC1suEw22c6xmspsp; __cf_bm=BS95IS_QPeqiUILdVHjCIV6YCd9Fs31a5egMZN8X0U0-1721961318-1.0.1.1-aPtKE.13enODokRbrdjpE7f31q68G0reBI2vmzK6rpmlFZfpAVQ_nIJYUPme_VOhC0TYuz5zAm4M34l.Xz1XFQ'
-'''
+message = st.text_input("Enter your message:", "Hello there")
+voice_id = st.text_input("Enter voice ID:", "pNInz6obpgDQGcFmaJgB")
 
-class StreamlitTTSApp:
-    def __init__(self):
-        self.conversation_id = self.get_conversation_id()
-        self.bad_words = self.load_bad_words()
-        self.bad_word_patterns = self.compile_bad_word_patterns()
+if st.button("Generate Audio"):
+    url = "https://chatin2.vercel.app/api/elevenlabs"
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36",
+        "authority": "chatin2.vercel.app",
+        "accept-language": "en-PH,en-US;q=0.9,en;q=0.8",
+        "content-type": "text/plain;charset=UTF-8",
+        "origin": "https://chatin2.vercel.app",
+        "referer": "https://chatin2.vercel.app/",
+        "sec-ch-ua": '"Not-A.Brand";v="99", "Chromium";v="124"',
+        "sec-ch-ua-mobile": "?1",
+        "sec-ch-ua-platform": '"Android"',
+        "sec-fetch-dest": "empty",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-site": "same-origin",
+        "Cookie": "uuid=f6c6d909-062f-49bf-8b64-85d9e8374fe0"
+    }
+    data = {
+        "data": {
+            "voiseId": voice_id,
+            "message": message
+        }
+    }
 
-    def run_curl(self, curl_command):
-        try:
-            result = subprocess.run(curl_command, shell=True, check=True, capture_output=True)
-            return result.stdout
-        except subprocess.CalledProcessError as e:
-            st.error(f"Error running curl command: {e}")
-            st.error(f"Stderr: {e.stderr}")
-            return None
+    audio_placeholder = st.empty()
+    status_placeholder = st.empty()
 
-    def get_conversation_id(self):
-        response = self.run_curl(CONVERSATIONS_CURL)
-        try:
-            data = json.loads(response)
-            return data.get('sid')
-        except json.JSONDecodeError:
-            st.error(f"Error decoding JSON: {response}")
-            return None
+    status_placeholder.text("Generating audio...")
+    audio_data = b""
+    for chunk in stream_audio(url, headers, data):
+        audio_data += chunk
+        status_placeholder.text(f"Received {len(audio_data)} bytes...")
 
-    def load_bad_words(self):
-        url = "https://raw.githubusercontent.com/LDNOOBW/List-of-Dirty-Naughty-Obscene-and-Otherwise-Bad-Words/master/en"
-        response = requests.get(url)
-        if response.status_code == 200:
-            return set(response.text.split())
-        else:
-            st.warning("Failed to load bad words list. Continuing without word filtering.")
-            return set()
+    status_placeholder.text("Audio generation complete!")
+    audio_placeholder.audio(audio_data, format="audio/mpeg", start_time=0)
 
-    def compile_bad_word_patterns(self):
-        return [re.compile(r'\b' + re.escape(word) + r'\b', re.IGNORECASE) for word in self.bad_words]
-
-    def contains_bad_word(self, message):
-        return any(pattern.search(message) for pattern in self.bad_word_patterns)
-
-    def send_message(self, message):
-        if self.contains_bad_word(message):
-            return "Blocked", None
-
-        chat_data = json.dumps({"text": message, "conversation": self.conversation_id})
-        chat_curl = CHAT_CURL.replace("'{}'", f"'{chat_data}'")
-        response = self.run_curl(chat_curl)
-
-        received_sid = None
-        full_response = ""
-        for line in response.decode('utf-8').splitlines():
-            if line.startswith('event: received'):
-                received_data = json.loads(next(line for line in response.decode('utf-8').splitlines() if line.startswith('data:')).split('data: ')[1])
-                received_sid = received_data.get('sid')
-            elif line.startswith('data:'):
-                try:
-                    event_data = json.loads(line[5:])
-                    if 'text' in event_data:
-                        full_response += event_data['text']
-                except json.JSONDecodeError:
-                    st.error(f"Error decoding JSON: {line}")
-
-        return full_response.strip(), received_sid
-
-    def get_voice(self, message_sid):
-        voice_curl = VOICE_CURL.format(message_sid)
-        voice_response = self.run_curl(voice_curl)
-        
-        with tempfile.NamedTemporaryFile(delete=False, suffix='.mp3') as temp_file:
-            temp_file.write(voice_response)
-            temp_file_path = temp_file.name
-        
-        return temp_file_path
-
-def main():
-    st.set_page_config(page_title="Streamlit TTS Chat App", page_icon="🗣️")
-    st.title("Streamlit TTS Chat App")
-
-    app = StreamlitTTSApp()
-
-    if "messages" not in st.session_state:
-        st.session_state.messages = []
-
-    for message in st.session_state.messages:
-        with st.chat_message(message["role"]):
-            st.markdown(message["content"])
-            if message["role"] == "assistant" and "audio" in message:
-                st.audio(message["audio"])
-
-    if prompt := st.chat_input("What is your message?"):
-        st.session_state.messages.append({"role": "user", "content": prompt})
-        with st.chat_message("user"):
-            st.markdown(prompt)
-
-        with st.chat_message("assistant"):
-            response, received_sid = app.send_message(prompt)
-            if response == "Blocked":
-                st.error("Your message was blocked due to inappropriate content.")
-            elif response:
-                st.markdown(response)
-                st.session_state.messages.append({"role": "assistant", "content": response})
-                if received_sid:
-                    audio_file = app.get_voice(received_sid)
-                    st.audio(audio_file)
-                    st.session_state.messages[-1]["audio"] = audio_file
-                else:
-                    st.warning("No 'received' event SID found in the response.")
-            else:
-                st.error("Failed to get a response. Please try again.")
-
-if __name__ == "__main__":
-    main()
+st.write("Note: This app streams the audio response from the ElevenLabs API.")
