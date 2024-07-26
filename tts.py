@@ -70,14 +70,10 @@ def get_chat_response(text):
         return None, None, None
 
 def get_voice_audio(message_sid, voice="voice8"):
-    params = {
-        "mode": "eager",
-        "voice": voice,
-        "messageSid": message_sid
-    }
+    url = f"{VOICE_API_URL}?mode=eager&voice={voice}&messageSid={message_sid}"
     
     try:
-        response = requests.get(VOICE_API_URL, headers=VOICE_HEADERS, params=params)
+        response = requests.get(url, headers=VOICE_HEADERS)
         response.raise_for_status()
         return io.BytesIO(response.content)
     except requests.exceptions.RequestException as e:
