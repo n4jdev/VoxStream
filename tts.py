@@ -59,17 +59,26 @@ def execute_voice_curl(message_sid, voice="voice8"):
         return None
 
 def parse_chat_response(response):
-    events = response.split('\n\n')
+    events = response.strip().split('\n\n')
     message_sid = None
     response_text = ""
     
     for event in events:
-        if event.startswith('event: message'):
-            message_data = json.loads(event.split('\n', 2)[1].split(': ', 1)[1])
-            message_sid = message_data['sid']
-        elif event.startswith('event: partial'):
-            partial_data = json.loads(event.split('\n', 2)[1].split(': ', 1)[1])
-            response_text = partial_data['text']
+        event_lines = event.split('\n')
+        if len(event_lines) < 2:
+            continue
+        
+        event_type = event_lines[0].split(': ', 1)[1] if ': ' in event_lines[0] else ''
+        event_data = event_lines[1].split(': ', 1)[1] if ': ' in event_lines[1] else ''
+        
+        try:
+            data = json.loads(event_data)
+            if event_type == 'message':
+                message_sid = data.get('sid')
+            elif event_type == 'partial':
+                response_text = data.get('text', '')
+        except json.JSONDecodeError:
+            continue
     
     return response_text, message_sid
 
@@ -84,8 +93,12 @@ def main():
             with st.spinner("Processing..."):
                 chat_response = execute_chat_curl(user_input)
                 if chat_response:
+                    st.text("Raw chat response:")
+                    st.text(chat_response)  # Display raw response for debugging
+                    
                     response_text, message_sid = parse_chat_response(chat_response)
                     st.write(f"Pi AI response: {response_text}")
+                    st.write(f"Message SID: {message_sid}")  # Display message_sid for debugging
                     
                     if message_sid:
                         st.write("Generating audio...")
