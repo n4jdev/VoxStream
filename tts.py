@@ -8,21 +8,26 @@ import json
 CHAT_API_URL = "https://pi.ai/api/chat"
 VOICE_API_URL = "https://pi.ai/api/chat/voice"
 HEADERS = {
-    'authority': 'pi.ai',
-    'accept': 'text/event-stream',
-    'accept-language': 'en-PH,en-US;q=0.9,en;q=0.8',
-    'content-type': 'application/json',
-    'cookie': '__Host-session=r98ovC1suEw22c6xmspsp; __cf_bm=BS95IS_QPeqiUILdVHjCIV6YCd9Fs31a5egMZN8X0U0-1721961318-1.0.1.1-aPtKE.13enODokRbrdjpE7f31q68G0reBI2vmzK6rpmlFZfpAVQ_nIJYUPme_VOhC0TYuz5zAm4M34l.Xz1XFQ',
-    'origin': 'https://pi.ai',
-    'referer': 'https://pi.ai/talk',
-    'sec-ch-ua': '"Not-A.Brand";v="99", "Chromium";v="124"',
-    'sec-ch-ua-mobile': '?1',
-    'sec-ch-ua-platform': '"Android"',
-    'sec-fetch-dest': 'empty',
-    'sec-fetch-mode': 'cors',
-    'sec-fetch-site': 'same-origin',
-    'user-agent': 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36',
-    'x-api-version': '3'
+  "Reqable-Id": "",
+  "Host": "",
+  "User-Agent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36",
+  "Connection": "keep-alive",
+  "Accept": "text/event-stream",
+  "Accept-Encoding": "gzip, deflate, br",
+  "Content-Type": "application/json",
+  "Content-Length": "",
+  "authority": "pi.ai",
+  "accept-language": "en-PH,en-US;q=0.9,en;q=0.8",
+  "cookie": "__Host-session=r98ovC1suEw22c6xmspsp; __cf_bm=BS95IS_QPeqiUILdVHjCIV6YCd9Fs31a5egMZN8X0U0-1721961318-1.0.1.1-aPtKE.13enODokRbrdjpE7f31q68G0reBI2vmzK6rpmlFZfpAVQ_nIJYUPme_VOhC0TYuz5zAm4M34l.Xz1XFQ",
+  "origin": "https://pi.ai",
+  "referer": "https://pi.ai/talk",
+  "sec-ch-ua": "\"Not-A.Brand\";v=\"99\", \"Chromium\";v=\"124\"",
+  "sec-ch-ua-mobile": "?1",
+  "sec-ch-ua-platform": "\"Android\"",
+  "sec-fetch-dest": "empty",
+  "sec-fetch-mode": "cors",
+  "sec-fetch-site": "same-origin",
+  "x-api-version": "3"
 }
 
 VOICE_HEADERS = {
