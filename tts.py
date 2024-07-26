@@ -9,11 +9,8 @@ st.title("StreamSpeak: Real-time TTS App")
 # Text input
 text_input = st.text_area("Enter text to convert to speech:", "Hello, welcome to StreamSpeak!")
 
-# Voice selection (currently only Onyx is available)
-voice = st.selectbox("Select voice:", ["onyx"])
-
-# Language selection (currently only Filipino/Tagalog is available)
-language = st.selectbox("Select language:", ["tl"])
+# Voice selection
+voice = st.selectbox("Select voice:", ["alloy", "echo", "fable", "onyx", "nova", "shimmer"])
 
 # Speed slider
 speed = st.slider("Speech speed:", min_value=0.5, max_value=2.0, value=1.0, step=0.1)
@@ -37,7 +34,6 @@ def stream_audio(text):
         "model": "tts-1-hd",
         "input": text,
         "voice": voice,
-        "language": language,
         "format": "mp3",
         "speed": speed
     }
@@ -93,18 +89,6 @@ if st.button("Generate Speech"):
             )
     else:
         st.warning("Please enter some text to convert to speech.")
-
-# App instructions
-st.markdown("""
-## How to use StreamSpeak:
-1. Enter the text you want to convert to speech in the text area.
-2. Select the desired voice (currently only Onyx is available).
-3. Choose the language (currently only Filipino/Tagalog is supported).
-4. Adjust the speech speed using the slider.
-5. Click the "Generate Speech" button.
-6. The audio will start playing automatically as it's being generated.
-7. You can download the generated audio using the "Download Audio" button.
-""")
 
 # Footer
 st.markdown("---")
