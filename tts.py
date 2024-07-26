@@ -1,89 +1,77 @@
 import streamlit as st
-import requests
-from sseclient import SSEClient
-import io
+import subprocess
 import json
+import io
+import re
 
-# Constants
-CHAT_API_URL = "https://pi.ai/api/chat"
-VOICE_API_URL = "https://pi.ai/api/chat/voice"
-HEADERS = {
-  "Reqable-Id": "",
-  "Host": "",
-  "User-Agent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36",
-  "Connection": "keep-alive",
-  "Accept": "text/event-stream",
-  "Accept-Encoding": "gzip, deflate, br",
-  "Content-Type": "application/json",
-  "Content-Length": "",
-  "authority": "pi.ai",
-  "accept-language": "en-PH,en-US;q=0.9,en;q=0.8",
-  "cookie": "__Host-session=r98ovC1suEw22c6xmspsp; __cf_bm=BS95IS_QPeqiUILdVHjCIV6YCd9Fs31a5egMZN8X0U0-1721961318-1.0.1.1-aPtKE.13enODokRbrdjpE7f31q68G0reBI2vmzK6rpmlFZfpAVQ_nIJYUPme_VOhC0TYuz5zAm4M34l.Xz1XFQ",
-  "origin": "https://pi.ai",
-  "referer": "https://pi.ai/talk",
-  "sec-ch-ua": "\"Not-A.Brand\";v=\"99\", \"Chromium\";v=\"124\"",
-  "sec-ch-ua-mobile": "?1",
-  "sec-ch-ua-platform": "\"Android\"",
-  "sec-fetch-dest": "empty",
-  "sec-fetch-mode": "cors",
-  "sec-fetch-site": "same-origin",
-  "x-api-version": "3"
-}
-
-VOICE_HEADERS = {
-    'User-Agent': 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36',
-    'authority': 'pi.ai',
-    'accept-language': 'en-PH,en-US;q=0.9,en;q=0.8',
-    'range': 'bytes=0-',
-    'referer': 'https://pi.ai/talk',
-    'sec-ch-ua': '"Not-A.Brand";v="99", "Chromium";v="124"',
-    'sec-ch-ua-mobile': '?1',
-    'sec-ch-ua-platform': '"Android"',
-    'sec-fetch-dest': 'audio',
-    'sec-fetch-mode': 'no-cors',
-    'sec-fetch-site': 'same-origin',
-    'Cookie': '__Host-session=r98ovC1suEw22c6xmspsp; __cf_bm=BS95IS_QPeqiUILdVHjCIV6YCd9Fs31a5egMZN8X0U0-1721961318-1.0.1.1-aPtKE.13enODokRbrdjpE7f31q68G0reBI2vmzK6rpmlFZfpAVQ_nIJYUPme_VOhC0TYuz5zAm4M34l.Xz1XFQ'
-}
-
-def get_chat_response(text):
-    data = {
-        "text": text,
-        "conversation": "14KD7b4aR8HAxnpbFJB6s"
-    }
+def execute_chat_curl(user_input):
+    curl_command = [
+        'curl', '-X', 'POST', 'https://pi.ai/api/chat',
+        '-H', 'User-Agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36',
+        '-H', 'Accept: text/event-stream',
+        '-H', 'Content-Type: application/json',
+        '-H', 'authority: pi.ai',
+        '-H', 'accept-language: en-PH,en-US;q=0.9,en;q=0.8',
+        '-H', 'origin: https://pi.ai',
+        '-H', 'referer: https://pi.ai/talk',
+        '-H', 'sec-ch-ua: "Not-A.Brand";v="99", "Chromium";v="124"',
+        '-H', 'sec-ch-ua-mobile: ?1',
+        '-H', 'sec-ch-ua-platform: "Android"',
+        '-H', 'sec-fetch-dest: empty',
+        '-H', 'sec-fetch-mode: cors',
+        '-H', 'sec-fetch-site: same-origin',
+        '-H', 'x-api-version: 3',
+        '-H', 'Cookie: __Host-session=r98ovC1suEw22c6xmspsp; __cf_bm=BS95IS_QPeqiUILdVHjCIV6YCd9Fs31a5egMZN8X0U0-1721961318-1.0.1.1-aPtKE.13enODokRbrdjpE7f31q68G0reBI2vmzK6rpmlFZfpAVQ_nIJYUPme_VOhC0TYuz5zAm4M34l.Xz1XFQ',
+        '-d', f'{{"text":"{user_input}","conversation":"14KD7b4aR8HAxnpbFJB6s"}}'
+    ]
     
     try:
-        response = requests.post(CHAT_API_URL, headers=HEADERS, json=data, stream=True)
-        response.raise_for_status()
-        client = SSEClient(response)
-        
-        received_sid = None
-        message_sid = None
-        response_text = ""
-        
-        for event in client.events():
-            if event.event == 'received':
-                received_sid = json.loads(event.data)['sid']
-            elif event.event == 'message':
-                message_sid = json.loads(event.data)['sid']
-            elif event.event == 'partial':
-                response_text = json.loads(event.data)['text']
-                break
-        
-        return response_text, received_sid, message_sid
-    except requests.exceptions.RequestException as e:
-        st.error(f"An error occurred while communicating with the Pi AI chat API: {str(e)}")
-        return None, None, None
-
-def get_voice_audio(message_sid, voice="voice8"):
-    url = f"{VOICE_API_URL}?mode=eager&voice={voice}&messageSid={message_sid}"
-    
-    try:
-        response = requests.get(url, headers=VOICE_HEADERS)
-        response.raise_for_status()
-        return io.BytesIO(response.content)
-    except requests.exceptions.RequestException as e:
-        st.error(f"Failed to get voice audio: {str(e)}")
+        result = subprocess.run(curl_command, capture_output=True, text=True, check=True)
+        return result.stdout
+    except subprocess.CalledProcessError as e:
+        st.error(f"Failed to get chat response: {e}")
+        st.error(f"Curl stderr: {e.stderr}")
         return None
+
+def execute_voice_curl(message_sid, voice="voice8"):
+    curl_command = [
+        'curl', '-X', 'GET', f'https://pi.ai/api/chat/voice?mode=eager&voice={voice}&messageSid={message_sid}',
+        '-H', 'User-Agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36',
+        '-H', 'authority: pi.ai',
+        '-H', 'accept-language: en-PH,en-US;q=0.9,en;q=0.8',
+        '-H', 'range: bytes=0-',
+        '-H', 'referer: https://pi.ai/talk',
+        '-H', 'sec-ch-ua: "Not-A.Brand";v="99", "Chromium";v="124"',
+        '-H', 'sec-ch-ua-mobile: ?1',
+        '-H', 'sec-ch-ua-platform: "Android"',
+        '-H', 'sec-fetch-dest: audio',
+        '-H', 'sec-fetch-mode: no-cors',
+        '-H', 'sec-fetch-site: same-origin',
+        '-H', 'Cookie: __Host-session=r98ovC1suEw22c6xmspsp; __cf_bm=BS95IS_QPeqiUILdVHjCIV6YCd9Fs31a5egMZN8X0U0-1721961318-1.0.1.1-aPtKE.13enODokRbrdjpE7f31q68G0reBI2vmzK6rpmlFZfpAVQ_nIJYUPme_VOhC0TYuz5zAm4M34l.Xz1XFQ'
+    ]
+    
+    try:
+        result = subprocess.run(curl_command, capture_output=True, check=True)
+        return io.BytesIO(result.stdout)
+    except subprocess.CalledProcessError as e:
+        st.error(f"Failed to get voice audio: {e}")
+        st.error(f"Curl stderr: {e.stderr}")
+        return None
+
+def parse_chat_response(response):
+    events = response.split('\n\n')
+    message_sid = None
+    response_text = ""
+    
+    for event in events:
+        if event.startswith('event: message'):
+            message_data = json.loads(event.split('\n', 2)[1].split(': ', 1)[1])
+            message_sid = message_data['sid']
+        elif event.startswith('event: partial'):
+            partial_data = json.loads(event.split('\n', 2)[1].split(': ', 1)[1])
+            response_text = partial_data['text']
+    
+    return response_text, message_sid
 
 def main():
     st.title("PiVoice: Text-to-Speech with Pi AI")
@@ -94,16 +82,20 @@ def main():
     if st.button("Generate Speech"):
         if user_input:
             with st.spinner("Processing..."):
-                response_text, received_sid, message_sid = get_chat_response(user_input)
-                if response_text:
+                chat_response = execute_chat_curl(user_input)
+                if chat_response:
+                    response_text, message_sid = parse_chat_response(chat_response)
                     st.write(f"Pi AI response: {response_text}")
                     
-                    st.write("Generating audio...")
-                    audio = get_voice_audio(message_sid, voice_option)
-                    if audio:
-                        st.audio(audio, format="audio/mp3")
+                    if message_sid:
+                        st.write("Generating audio...")
+                        audio = execute_voice_curl(message_sid, voice_option)
+                        if audio:
+                            st.audio(audio, format="audio/mpeg")
+                        else:
+                            st.error("Failed to generate audio. Please try again.")
                     else:
-                        st.error("Failed to generate audio. Please try again.")
+                        st.error("Failed to get message ID. Please try again.")
                 else:
                     st.error("Failed to get a response from Pi AI. Please try again later.")
         else:
