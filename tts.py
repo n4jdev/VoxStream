@@ -1,134 +1,107 @@
 import streamlit as st
 import requests
-import base64
-import os
-import hashlib
+from sseclient import SSEClient
+import io
 
-# ElevenLabs API endpoint
-API_URL = "https://chatin2.vercel.app/api/elevenlabs"
-
-# Available voices
-VOICES = {
-    "Rachel": "21m00Tcm4TlvDq8ikWAM",
-    "Domi": "AZnzlk1XvdvUeBnXmlld",
-    "Bella": "EXAVITQu4vr4xnSDxMaL",
-    "Antoni": "ErXwobaYiN019PkySvjV",
-    "Elli": "MF3mGyEYCl7XYWbV9V6O",
-    "Josh": "TxGEqnHWrfWFTfGW9XjX",
-    "Arnold": "VR6AewLTigWG4xSOukaG",
-    "Adam": "pNInz6obpgDQGcFmaJgB",
-    "Sam": "yoZ06aMxZJJ28mfd3POQ"
+# Constants
+CHAT_API_URL = "https://pi.ai/api/chat"
+VOICE_API_URL = "https://pi.ai/api/chat/voice"
+HEADERS = {
+    'authority': 'pi.ai',
+    'accept': 'text/event-stream',
+    'accept-language': 'en-PH,en-US;q=0.9,en;q=0.8',
+    'content-type': 'application/json',
+    'cookie': '__Host-session=r98ovC1suEw22c6xmspsp; __cf_bm=BS95IS_QPeqiUILdVHjCIV6YCd9Fs31a5egMZN8X0U0-1721961318-1.0.1.1-aPtKE.13enODokRbrdjpE7f31q68G0reBI2vmzK6rpmlFZfpAVQ_nIJYUPme_VOhC0TYuz5zAm4M34l.Xz1XFQ',
+    'origin': 'https://pi.ai',
+    'referer': 'https://pi.ai/talk',
+    'sec-ch-ua': '"Not-A.Brand";v="99", "Chromium";v="124"',
+    'sec-ch-ua-mobile': '?1',
+    'sec-ch-ua-platform': '"Android"',
+    'sec-fetch-dest': 'empty',
+    'sec-fetch-mode': 'cors',
+    'sec-fetch-site': 'same-origin',
+    'user-agent': 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36',
+    'x-api-version': '3'
 }
 
-# Cache directory
-CACHE_DIR = "voice_cache"
-os.makedirs(CACHE_DIR, exist_ok=True)
+VOICE_HEADERS = {
+    'authority': 'pi.ai',
+    'accept': '*/*',
+    'accept-language': 'en-PH,en-US;q=0.9,en;q=0.8',
+    'cookie': '__Host-session=r98ovC1suEw22c6xmspsp; __cf_bm=BS95IS_QPeqiUILdVHjCIV6YCd9Fs31a5egMZN8X0U0-1721961318-1.0.1.1-aPtKE.13enODokRbrdjpE7f31q68G0reBI2vmzK6rpmlFZfpAVQ_nIJYUPme_VOhC0TYuz5zAm4M34l.Xz1XFQ',
+    'range': 'bytes=0-',
+    'referer': 'https://pi.ai/talk',
+    'sec-ch-ua': '"Not-A.Brand";v="99", "Chromium";v="124"',
+    'sec-ch-ua-mobile': '?1',
+    'sec-ch-ua-platform': '"Android"',
+    'sec-fetch-dest': 'audio',
+    'sec-fetch-mode': 'no-cors',
+    'sec-fetch-site': 'same-origin',
+    'user-agent': 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36'
+}
 
-@st.cache_data
-def text_to_speech(text, voice_id):
-    # Generate a unique cache key based on the text and voice_id
-    cache_key = hashlib.md5(f"{text}:{voice_id}".encode()).hexdigest()
-    cache_file = os.path.join(CACHE_DIR, f"{cache_key}.mp3")
-
-    # Check if the audio is already cached
-    if os.path.exists(cache_file):
-        with open(cache_file, "rb") as f:
-            return f.read()
-
-    headers = {
-        'User-Agent': 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36',
-        'authority': 'chatin2.vercel.app',
-        'accept-language': 'en-PH,en-US;q=0.9,en;q=0.8',
-        'content-type': 'text/plain;charset=UTF-8',
-        'origin': 'https://chatin2.vercel.app',
-        'referer': 'https://chatin2.vercel.app/',
-        'sec-ch-ua': '"Not-A.Brand";v="99", "Chromium";v="124"',
-        'sec-ch-ua-mobile': '?1',
-        'sec-ch-ua-platform': '"Android"',
-        'sec-fetch-dest': 'empty',
-        'sec-fetch-mode': 'cors',
-        'sec-fetch-site': 'same-origin',
-        'Cookie': 'uuid=f6c6d909-062f-49bf-8b64-85d9e8374fe0'
-    }
-    
+def get_chat_response(text):
     data = {
-        "data": {
-            "voiseId": voice_id,
-            "message": text
-        }
+        "text": text,
+        "conversation": "14KD7b4aR8HAxnpbFJB6s"
     }
     
-    response = requests.post(API_URL, headers=headers, json=data)
+    response = requests.post(CHAT_API_URL, headers=HEADERS, json=data, stream=True)
+    client = SSEClient(response)
+    
+    received_sid = None
+    message_sid = None
+    response_text = ""
+    
+    for event in client.events():
+        if event.event == 'received':
+            received_sid = event.data['sid']
+        elif event.event == 'message':
+            message_sid = event.data['sid']
+        elif event.event == 'partial':
+            response_text = event.data['text']
+            break
+    
+    return response_text, received_sid, message_sid
+
+def get_voice_audio(message_sid, voice="voice8"):
+    params = {
+        "mode": "eager",
+        "voice": voice,
+        "messageSid": message_sid
+    }
+    
+    response = requests.get(VOICE_API_URL, headers=VOICE_HEADERS, params=params)
     
     if response.status_code == 200:
-        # Cache the audio file
-        with open(cache_file, "wb") as f:
-            f.write(response.content)
-        return response.content
+        return io.BytesIO(response.content)
     else:
-        st.error(f"Error: {response.status_code} - {response.text}")
+        st.error(f"Failed to get voice audio. Status code: {response.status_code}")
         return None
 
-def get_binary_file_downloader_html(bin_file, file_label='File'):
-    bin_str = base64.b64encode(bin_file).decode()
-    href = f'<a href="data:application/octet-stream;base64,{bin_str}" download="{file_label}.mp3">Download {file_label}</a>'
-    return href
-
 def main():
-    st.set_page_config(page_title="VoxStream: Text-to-Speech Converter", page_icon="🎙️", layout="wide")
+    st.title("PiVoice: Text-to-Speech with Pi AI")
     
-    st.title("VoxStream: Text-to-Speech Converter")
-    st.write("Convert your text to speech using ElevenLabs API")
-
-    col1, col2 = st.columns([2, 1])
-
-    with col1:
-        text_input = st.text_area("Enter the text you want to convert to speech:", height=150)
-        char_count = len(text_input)
-        st.write(f"Character count: {char_count}")
-
-        use_custom_voice = st.checkbox("Use Custom Voice")
-        if use_custom_voice:
-            voice_id = st.text_input("Enter Custom Voice ID:")
+    user_input = st.text_input("Enter your text:")
+    voice_option = st.selectbox("Select voice:", ["voice1", "voice2", "voice3", "voice4", "voice5", "voice6", "voice7", "voice8"])
+    
+    if st.button("Generate Speech"):
+        if user_input:
+            with st.spinner("Processing..."):
+                response_text, received_sid, message_sid = get_chat_response(user_input)
+                st.write(f"Pi AI response: {response_text}")
+                
+                st.write("Generating audio for 'received' event...")
+                received_audio = get_voice_audio(received_sid, voice_option)
+                if received_audio:
+                    st.audio(received_audio, format="audio/mp3")
+                
+                st.write("Generating audio for 'message' event...")
+                message_audio = get_voice_audio(message_sid, voice_option)
+                if message_audio:
+                    st.audio(message_audio, format="audio/mp3")
         else:
-            voice = st.selectbox("Select a voice:", list(VOICES.keys()))
-            voice_id = VOICES[voice]
-
-        if st.button("Generate Speech"):
-            if text_input.strip() == "":
-                st.warning("Please enter some text to convert.")
-            else:
-                with st.spinner("Generating speech..."):
-                    audio_content = text_to_speech(text_input, voice_id)
-                    
-                    if audio_content:
-                        st.success("Speech generated successfully!")
-                        
-                        # Play audio
-                        st.audio(audio_content, format="audio/mp3")
-                        
-                        # Download button
-                        st.markdown(get_binary_file_downloader_html(audio_content, f"VoxStream_audio"), unsafe_allow_html=True)
-
-    with col2:
-        st.subheader("About Custom Voices")
-        st.write("""
-        To use a custom voice:
-        1. Check the "Use Custom Voice" box
-        2. Enter your custom voice ID
-        3. Generate speech as usual
-        
-        You can obtain custom voice IDs from your ElevenLabs account.
-        """)
-
-    # Display cache info
-    st.sidebar.title("Cache Information")
-    cache_size = sum(os.path.getsize(os.path.join(CACHE_DIR, f)) for f in os.listdir(CACHE_DIR))
-    st.sidebar.write(f"Cache size: {cache_size / 1024 / 1024:.2f} MB")
-    if st.sidebar.button("Clear Cache"):
-        for file in os.listdir(CACHE_DIR):
-            os.remove(os.path.join(CACHE_DIR, file))
-        st.sidebar.success("Cache cleared successfully!")
+            st.warning("Please enter some text.")
 
 if __name__ == "__main__":
     main()
