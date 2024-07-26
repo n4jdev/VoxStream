@@ -1,16 +1,13 @@
 import streamlit as st
 import requests
 import base64
-import io
-from pydub import AudioSegment
-from pydub.generators import WhiteNoise
-import random
+import time
 
 # Streamlit app title
 st.title("StreamSpeak: Real-time TTS App")
 
 # Text input
-text_input = st.text_area("Enter text to convert to speech:", "Hello, my name is Kayla, I'm one of the voices that you can use to speech enable your website. When I'm reading your text it sounds like this.")
+text_input = st.text_area("Enter text to convert to speech:", "Hello, welcome to StreamSpeak!")
 
 # Voice selection
 voice = st.selectbox("Select voice:", ["alloy", "echo", "fable", "onyx", "nova", "shimmer"])
@@ -44,27 +41,10 @@ def stream_audio(text):
     try:
         response = requests.post(API_URL, headers=headers, json=payload, stream=True)
         response.raise_for_status()
-        return response.content
+        return response.iter_content(chunk_size=4096)
     except requests.RequestException as e:
         st.error(f"Error: {str(e)}")
         return None
-
-def add_human_like_effects(audio_segment):
-    # Add subtle white noise
-    noise = WhiteNoise().to_audio_segment(duration=len(audio_segment)).apply_gain(-30)
-    audio_segment = audio_segment.overlay(noise)
-
-    # Add some grain
-    grain = audio_segment.compress_dynamic_range()
-    audio_segment = audio_segment.overlay(grain.apply_gain(-15))
-
-    # Occasionally add glitches
-    if random.random() < 0.1:  # 10% chance of a glitch
-        glitch_pos = random.randint(0, len(audio_segment) - 100)
-        glitch = audio_segment[glitch_pos:glitch_pos+100].invert_phase()
-        audio_segment = audio_segment.overlay(glitch, position=glitch_pos)
-
-    return audio_segment
 
 # Always display the audio player
 audio_player = st.empty()
@@ -74,26 +54,25 @@ audio_player.audio("data:audio/mp3;base64,", format="audio/mp3")
 if st.button("Generate Speech"):
     if text_input:
         # Stream the audio
-        audio_data = stream_audio(text_input)
+        audio_stream = stream_audio(text_input)
         
-        if audio_data:
-            # Process the audio data
-            audio_segment = AudioSegment.from_mp3(io.BytesIO(audio_data))
-            processed_audio = add_human_like_effects(audio_segment)
+        if audio_stream:
+            audio_data = b""
             
-            # Convert back to bytes
-            buffer = io.BytesIO()
-            processed_audio.export(buffer, format="mp3")
-            processed_audio_data = buffer.getvalue()
+            for chunk in audio_stream:
+                audio_data += chunk
+                
+                # Update the audio player with the current data
+                audio_base64 = base64.b64encode(audio_data).decode()
+                audio_player.audio(f"data:audio/mp3;base64,{audio_base64}", format="audio/mp3")
+                
+                # Add a small delay to allow for smoother updates
+                time.sleep(0.1)
             
-            # Update the audio player with the processed data
-            audio_base64 = base64.b64encode(processed_audio_data).decode()
-            audio_player.audio(f"data:audio/mp3;base64,{audio_base64}", format="audio/mp3")
-            
-            # Provide download link for the processed audio
+            # Provide download link
             st.download_button(
                 label="Download Audio",
-                data=processed_audio_data,
+                data=audio_data,
                 file_name="generated_speech.mp3",
                 mime="audio/mp3"
             )
