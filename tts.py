@@ -1,9 +1,7 @@
 import streamlit as st
 import requests
-import json
 import base64
 import time
-import uuid
 
 # Streamlit app title
 st.title("StreamSpeak: Real-time TTS App")
@@ -11,50 +9,41 @@ st.title("StreamSpeak: Real-time TTS App")
 # Text input
 text_input = st.text_area("Enter text to convert to speech:", "Hello, welcome to StreamSpeak!")
 
-# Voice selection
-voices = {
-    "Rachel": "21m00Tcm4TlvDq8ikWAM",
-    "Domi": "AZnzlk1XvdvUeBnXmlld",
-    "Bella": "EXAVITQu4vr4xnSDxMaL",
-    "Antoni": "ErXwobaYiN019PkySvjV",
-    "Elli": "MF3mGyEYCl7XYWbV9V6O",
-    "Josh": "TxGEqnHWrfWFTfGW9XjX",
-    "Arnold": "VR6AewLTigWG4xSOukaG",
-    "Adam": "pNInz6obpgDQGcFmaJgB",
-    "Sam": "yoZ06aMxZJJ28mfd3POQ"
-}
-voice = st.selectbox("Select voice:", list(voices.keys()))
+# Voice selection (currently only Onyx is available)
+voice = st.selectbox("Select voice:", ["onyx"])
+
+# Language selection (currently only Filipino/Tagalog is available)
+language = st.selectbox("Select language:", ["tl"])
+
+# Speed slider
+speed = st.slider("Speech speed:", min_value=0.5, max_value=2.0, value=1.0, step=0.1)
 
 # API endpoint
-API_URL = "https://chatin2.vercel.app/api/elevenlabs"
+API_URL = "https://europe-west3-bubble-io-284016.cloudfunctions.net/get-stream"
 
 # API headers
 headers = {
     "User-Agent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36",
-    "authority": "chatin2.vercel.app",
+    "Content-Type": "application/json",
+    "authority": "europe-west3-bubble-io-284016.cloudfunctions.net",
     "accept-language": "en-PH,en-US;q=0.9,en;q=0.8",
-    "content-type": "text/plain;charset=UTF-8",
-    "origin": "https://chatin2.vercel.app",
-    "referer": "https://chatin2.vercel.app/",
-    "sec-ch-ua": '"Not-A.Brand";v="99", "Chromium";v="124"',
-    "sec-ch-ua-mobile": "?1",
-    "sec-ch-ua-platform": '"Android"',
-    "sec-fetch-dest": "empty",
-    "sec-fetch-mode": "cors",
-    "sec-fetch-site": "same-origin",
-    "Cookie": f"uuid={uuid.uuid4()}"
+    "authorization": "Bearer dc22c6f09ef2fa3d96a53b589ecc2b5a644db8fb24bbd21dac77370017fb792208e358d5df25bb1f2669304fb7bbd5f3f08119079044421acf8e0663667a573f03606155273cb02a2a62d9b310a5c2d49fef56b45c59ed6f4e06cc0b31e91f1ba96f364ab6f350ef30d3c4c7e88c09b44ed889ee2e3b09646c7855c3f43272d82a13ff0bbbd5a88b54dc312f60bfaa3a9931e10a47b4cbb8b4be78c687757ee6855d030f836622b9dc8e062dcccaa9601a96c52fe3528be876ed6ed4bc193e1448e96518569bcf98e509df22effed1ed1a405c29438fb3af307281d8416f84146244d7e9b8f58f5af35f6c5b8ee1c2ef5f3e271ec49849704b6d0272f3f709e550db9c3c158f3f18851a9d4cab008c87eac57c04f3d9d899ced500998d0d61e35b691642",
+    "origin": "https://openaitexttospeechdemo.bubbleapps.io",
+    "referer": "https://openaitexttospeechdemo.bubbleapps.io/",
 }
 
-def stream_audio(text, voice_id):
+def stream_audio(text):
     payload = {
-        "data": {
-            "voiseId": voice_id,
-            "message": text
-        }
+        "model": "tts-1-hd",
+        "input": text,
+        "voice": voice,
+        "language": language,
+        "format": "mp3",
+        "speed": speed
     }
     
     try:
-        response = requests.post(API_URL, headers=headers, data=json.dumps(payload), stream=True)
+        response = requests.post(API_URL, headers=headers, json=payload, stream=True)
         response.raise_for_status()
         return response.iter_content(chunk_size=4096)
     except requests.RequestException as e:
@@ -71,7 +60,7 @@ if 'audio_data' not in st.session_state:
 # Function to update audio player
 def update_audio_player():
     audio_base64 = base64.b64encode(st.session_state.audio_data).decode()
-    audio_player.markdown(f'<audio id="audio-player" src="data:audio/mpeg;base64,{audio_base64}" controls>Your browser does not support the audio element.</audio>', unsafe_allow_html=True)
+    audio_player.markdown(f'<audio id="audio-player" src="data:audio/mp3;base64,{audio_base64}" controls>Your browser does not support the audio element.</audio>', unsafe_allow_html=True)
 
 # Initial audio player (empty)
 update_audio_player()
@@ -86,7 +75,7 @@ if st.button("Generate Speech"):
         status = st.empty()
         
         # Stream the audio
-        audio_stream = stream_audio(text_input, voices[voice])
+        audio_stream = stream_audio(text_input)
         
         if audio_stream:
             start_time = time.time()
@@ -112,7 +101,7 @@ if st.button("Generate Speech"):
                 label="Download Audio",
                 data=st.session_state.audio_data,
                 file_name="generated_speech.mp3",
-                mime="audio/mpeg"
+                mime="audio/mp3"
             )
             
             # Add JavaScript to start playing the audio
@@ -129,12 +118,14 @@ if st.button("Generate Speech"):
 st.markdown("""
 ## How to use StreamSpeak:
 1. Enter the text you want to convert to speech in the text area.
-2. Select the desired voice from the available options.
-3. Click the "Generate Speech" button.
-4. The audio will start playing automatically as it's being generated.
-5. You can download the generated audio using the "Download Audio" button.
+2. Select the desired voice (currently only Onyx is available).
+3. Choose the language (currently only Filipino/Tagalog is supported).
+4. Adjust the speech speed using the slider.
+5. Click the "Generate Speech" button.
+6. The audio will start playing automatically as it's being generated.
+7. You can download the generated audio using the "Download Audio" button.
 """)
 
 # Footer
 st.markdown("---")
-st.markdown("StreamSpeak - Powered by Streamlit and ElevenLabs API")
+st.markdown("StreamSpeak - Powered by Streamlit and Custom TTS API")
