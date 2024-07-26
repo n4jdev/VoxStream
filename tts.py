@@ -1,8 +1,7 @@
 import streamlit as st
 import requests
-import json
 import base64
-import io
+import time
 
 # Streamlit app title
 st.title("StreamSpeak: Real-time TTS App")
@@ -39,7 +38,6 @@ headers = {
     "sec-fetch-site": "cross-site",
 }
 
-# Function to stream audio
 def stream_audio(text):
     payload = {
         "model": "tts-1-hd",
@@ -52,12 +50,7 @@ def stream_audio(text):
     
     with requests.post(API_URL, headers=headers, json=payload, stream=True) as response:
         if response.status_code == 200:
-            buffer = io.BytesIO()
-            for chunk in response.iter_content(chunk_size=4096):
-                if chunk:
-                    buffer.write(chunk)
-            buffer.seek(0)
-            return buffer
+            return response.iter_content(chunk_size=4096)
         else:
             st.error(f"Error: {response.status_code} - {response.text}")
             return None
@@ -68,20 +61,39 @@ if st.button("Generate Speech"):
         # Create a placeholder for the audio player
         audio_placeholder = st.empty()
         
-        # Stream the audio
-        audio_buffer = stream_audio(text_input)
+        # Create a status message
+        status = st.empty()
         
-        if audio_buffer:
-            # Convert audio buffer to base64
-            audio_base64 = base64.b64encode(audio_buffer.getvalue()).decode()
+        # Initialize an empty byte string to store the audio data
+        audio_data = b""
+        
+        # Stream the audio
+        chunks = stream_audio(text_input)
+        
+        if chunks:
+            start_time = time.time()
+            for i, chunk in enumerate(chunks):
+                if chunk:
+                    audio_data += chunk
+                    
+                    # Update the audio player with the current data
+                    audio_base64 = base64.b64encode(audio_data).decode()
+                    audio_placeholder.markdown(f'<audio src="data:audio/mp3;base64,{audio_base64}" controls autoplay></audio>', unsafe_allow_html=True)
+                    
+                    # Update status message
+                    elapsed_time = time.time() - start_time
+                    status.text(f"Streaming audio... {elapsed_time:.2f} seconds")
+                    
+                    # Add a small delay to allow for smoother updates
+                    time.sleep(0.1)
             
-            # Display the audio player
-            audio_placeholder.audio(audio_buffer, format="audio/mp3")
+            # Final update
+            status.text(f"Audio generation complete. Total time: {time.time() - start_time:.2f} seconds")
             
             # Provide download link
             st.download_button(
                 label="Download Audio",
-                data=audio_buffer,
+                data=audio_data,
                 file_name="generated_speech.mp3",
                 mime="audio/mp3"
             )
