@@ -53,15 +53,11 @@ audio_player.audio("data:audio/mp3;base64,", format="audio/mp3")
 # Generate button
 if st.button("Generate Speech"):
     if text_input:
-        # Create a status message
-        status = st.empty()
-        
         # Stream the audio
         audio_stream = stream_audio(text_input)
         
         if audio_stream:
             audio_data = b""
-            start_time = time.time()
             
             for chunk in audio_stream:
                 audio_data += chunk
@@ -70,15 +66,8 @@ if st.button("Generate Speech"):
                 audio_base64 = base64.b64encode(audio_data).decode()
                 audio_player.audio(f"data:audio/mp3;base64,{audio_base64}", format="audio/mp3")
                 
-                # Update status message (removed "Streaming audio..." text)
-                elapsed_time = time.time() - start_time
-                status.text(f"{elapsed_time:.2f} seconds")
-                
                 # Add a small delay to allow for smoother updates
                 time.sleep(0.1)
-            
-            # Final update
-            status.text(f"Audio generation complete. Total time: {time.time() - start_time:.2f} seconds")
             
             # Provide download link
             st.download_button(
