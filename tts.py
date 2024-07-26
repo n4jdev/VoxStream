@@ -2,6 +2,7 @@ import streamlit as st
 import requests
 from sseclient import SSEClient
 import io
+import json
 
 # Constants
 CHAT_API_URL = "https://pi.ai/api/chat"
@@ -25,10 +26,9 @@ HEADERS = {
 }
 
 VOICE_HEADERS = {
+    'User-Agent': 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36',
     'authority': 'pi.ai',
-    'accept': '*/*',
     'accept-language': 'en-PH,en-US;q=0.9,en;q=0.8',
-    'cookie': '__Host-session=r98ovC1suEw22c6xmspsp; __cf_bm=BS95IS_QPeqiUILdVHjCIV6YCd9Fs31a5egMZN8X0U0-1721961318-1.0.1.1-aPtKE.13enODokRbrdjpE7f31q68G0reBI2vmzK6rpmlFZfpAVQ_nIJYUPme_VOhC0TYuz5zAm4M34l.Xz1XFQ',
     'range': 'bytes=0-',
     'referer': 'https://pi.ai/talk',
     'sec-ch-ua': '"Not-A.Brand";v="99", "Chromium";v="124"',
@@ -37,7 +37,7 @@ VOICE_HEADERS = {
     'sec-fetch-dest': 'audio',
     'sec-fetch-mode': 'no-cors',
     'sec-fetch-site': 'same-origin',
-    'user-agent': 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36'
+    'Cookie': '__Host-session=r98ovC1suEw22c6xmspsp; __cf_bm=BS95IS_QPeqiUILdVHjCIV6YCd9Fs31a5egMZN8X0U0-1721961318-1.0.1.1-aPtKE.13enODokRbrdjpE7f31q68G0reBI2vmzK6rpmlFZfpAVQ_nIJYUPme_VOhC0TYuz5zAm4M34l.Xz1XFQ'
 }
 
 def get_chat_response(text):
@@ -57,11 +57,11 @@ def get_chat_response(text):
         
         for event in client.events():
             if event.event == 'received':
-                received_sid = event.data['sid']
+                received_sid = json.loads(event.data)['sid']
             elif event.event == 'message':
-                message_sid = event.data['sid']
+                message_sid = json.loads(event.data)['sid']
             elif event.event == 'partial':
-                response_text = event.data['text']
+                response_text = json.loads(event.data)['text']
                 break
         
         return response_text, received_sid, message_sid
@@ -97,17 +97,12 @@ def main():
                 if response_text:
                     st.write(f"Pi AI response: {response_text}")
                     
-                    if received_sid:
-                        st.write("Generating audio for 'received' event...")
-                        received_audio = get_voice_audio(received_sid, voice_option)
-                        if received_audio:
-                            st.audio(received_audio, format="audio/mp3")
-                    
-                    if message_sid:
-                        st.write("Generating audio for 'message' event...")
-                        message_audio = get_voice_audio(message_sid, voice_option)
-                        if message_audio:
-                            st.audio(message_audio, format="audio/mp3")
+                    st.write("Generating audio...")
+                    audio = get_voice_audio(message_sid, voice_option)
+                    if audio:
+                        st.audio(audio, format="audio/mp3")
+                    else:
+                        st.error("Failed to generate audio. Please try again.")
                 else:
                     st.error("Failed to get a response from Pi AI. Please try again later.")
         else:
