@@ -60,7 +60,54 @@ if 'audio_data' not in st.session_state:
 # Function to update audio player
 def update_audio_player():
     audio_base64 = base64.b64encode(st.session_state.audio_data).decode()
-    audio_player.markdown(f'<audio id="audio-player" src="data:audio/mp3;base64,{audio_base64}" controls>Your browser does not support the audio element.</audio>', unsafe_allow_html=True)
+    audio_player.markdown(
+        f"""
+        <audio id="audio-player" controls>
+            <source src="data:audio/mp3;base64,{audio_base64}" type="audio/mp3">
+            Your browser does not support the audio element.
+        </audio>
+        <script>
+            const audioPlayer = document.getElementById('audio-player');
+            const audioSource = audioPlayer.querySelector('source');
+            let isPlaying = false;
+            let currentTime = 0;
+
+            function updateAudioSource(newSource) {{
+                isPlaying = !audioPlayer.paused;
+                currentTime = audioPlayer.currentTime;
+                audioSource.src = newSource;
+                audioPlayer.load();
+                if (isPlaying) {{
+                    audioPlayer.play();
+                }}
+                audioPlayer.currentTime = currentTime;
+            }}
+
+            const streamlitDoc = window.parent.document;
+            const streamlitApp = streamlitDoc.querySelector('.stApp');
+
+            const observer = new MutationObserver((mutations) => {{
+                mutations.forEach((mutation) => {{
+                    if (mutation.type === 'childList') {{
+                        const addedNodes = mutation.addedNodes;
+                        for (let i = 0; i < addedNodes.length; i++) {{
+                            if (addedNodes[i].tagName === 'IFRAME') {{
+                                const iframeDoc = addedNodes[i].contentDocument || addedNodes[i].contentWindow.document;
+                                const newAudioPlayer = iframeDoc.querySelector('#audio-player source');
+                                if (newAudioPlayer && newAudioPlayer.src !== audioSource.src) {{
+                                    updateAudioSource(newAudioPlayer.src);
+                                }}
+                            }}
+                        }}
+                    }}
+                }});
+            }});
+
+            observer.observe(streamlitApp, {{ childList: true, subtree: true }});
+        </script>
+        """,
+        unsafe_allow_html=True
+    )
 
 # Initial audio player (empty)
 update_audio_player()
@@ -103,14 +150,6 @@ if st.button("Generate Speech"):
                 file_name="generated_speech.mp3",
                 mime="audio/mp3"
             )
-            
-            # Add JavaScript to start playing the audio
-            st.markdown("""
-                <script>
-                    const audioPlayer = document.getElementById('audio-player');
-                    audioPlayer.play();
-                </script>
-            """, unsafe_allow_html=True)
     else:
         st.warning("Please enter some text to convert to speech.")
 
