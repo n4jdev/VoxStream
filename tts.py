@@ -2,8 +2,10 @@ import streamlit as st
 import requests
 import base64
 import time
+import json
 
 # Streamlit app title
+st.set_page_config(page_title="StreamSpeak: Real-time TTS App", page_icon="🎙️")
 st.title("StreamSpeak: Real-time TTS App")
 
 # Text input
@@ -60,54 +62,7 @@ if 'audio_data' not in st.session_state:
 # Function to update audio player
 def update_audio_player():
     audio_base64 = base64.b64encode(st.session_state.audio_data).decode()
-    audio_player.markdown(
-        f"""
-        <audio id="audio-player" controls>
-            <source src="data:audio/mp3;base64,{audio_base64}" type="audio/mp3">
-            Your browser does not support the audio element.
-        </audio>
-        <script>
-            const audioPlayer = document.getElementById('audio-player');
-            const audioSource = audioPlayer.querySelector('source');
-            let isPlaying = false;
-            let currentTime = 0;
-
-            function updateAudioSource(newSource) {{
-                isPlaying = !audioPlayer.paused;
-                currentTime = audioPlayer.currentTime;
-                audioSource.src = newSource;
-                audioPlayer.load();
-                if (isPlaying) {{
-                    audioPlayer.play();
-                }}
-                audioPlayer.currentTime = currentTime;
-            }}
-
-            const streamlitDoc = window.parent.document;
-            const streamlitApp = streamlitDoc.querySelector('.stApp');
-
-            const observer = new MutationObserver((mutations) => {{
-                mutations.forEach((mutation) => {{
-                    if (mutation.type === 'childList') {{
-                        const addedNodes = mutation.addedNodes;
-                        for (let i = 0; i < addedNodes.length; i++) {{
-                            if (addedNodes[i].tagName === 'IFRAME') {{
-                                const iframeDoc = addedNodes[i].contentDocument || addedNodes[i].contentWindow.document;
-                                const newAudioPlayer = iframeDoc.querySelector('#audio-player source');
-                                if (newAudioPlayer && newAudioPlayer.src !== audioSource.src) {{
-                                    updateAudioSource(newAudioPlayer.src);
-                                }}
-                            }}
-                        }}
-                    }}
-                }});
-            }});
-
-            observer.observe(streamlitApp, {{ childList: true, subtree: true }});
-        </script>
-        """,
-        unsafe_allow_html=True
-    )
+    audio_player.markdown(f'<audio id="audio-player" src="data:audio/mp3;base64,{audio_base64}" controls>Your browser does not support the audio element.</audio>', unsafe_allow_html=True)
 
 # Initial audio player (empty)
 update_audio_player()
@@ -131,7 +86,8 @@ if st.button("Generate Speech"):
                 st.session_state.audio_data += chunk
                 
                 # Update the audio player with the current data
-                update_audio_player()
+                audio_base64 = base64.b64encode(st.session_state.audio_data).decode()
+                st.session_state.current_audio_data = audio_base64
                 
                 # Update status message
                 elapsed_time = time.time() - start_time
@@ -150,6 +106,39 @@ if st.button("Generate Speech"):
                 file_name="generated_speech.mp3",
                 mime="audio/mp3"
             )
+            
+            # Update the audio player one last time
+            update_audio_player()
+            
+            # Add JavaScript to start playing the audio and handle updates
+            st.markdown("""
+                <script>
+                    const audioPlayer = document.getElementById('audio-player');
+                    
+                    function updateAudioSource(base64Data) {
+                        const currentTime = audioPlayer.currentTime;
+                        const wasPlaying = !audioPlayer.paused;
+                        audioPlayer.src = `data:audio/mp3;base64,${base64Data}`;
+                        audioPlayer.load();
+                        audioPlayer.currentTime = currentTime;
+                        if (wasPlaying) {
+                            audioPlayer.play();
+                        }
+                    }
+                    
+                    function checkForUpdates() {
+                        fetch('_stcore/stream')
+                            .then(response => response.json())
+                            .then(data => {
+                                if (data.current_audio_data) {
+                                    updateAudioSource(data.current_audio_data);
+                                }
+                            });
+                    }
+                    
+                    setInterval(checkForUpdates, 1000);
+                </script>
+            """, unsafe_allow_html=True)
     else:
         st.warning("Please enter some text to convert to speech.")
 
