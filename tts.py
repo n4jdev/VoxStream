@@ -2,7 +2,8 @@ import streamlit as st
 import requests
 import io
 from pydub import AudioSegment
-from pydub.playback import play
+import tempfile
+import os
 
 # Streamlit app configuration
 st.set_page_config(page_title="StreamSpeak: Chunked TTS Audio Streamer", page_icon="🎙️")
@@ -48,10 +49,20 @@ def generate_and_play_chunked_audio(text, voice, language, speed):
             # Create a placeholder for the audio player
             audio_placeholder = st.empty()
             
-            # Stream and play audio in chunks
-            for audio_chunk in stream_audio_chunks(response):
-                audio_bytes = audio_chunk.export(format="mp3").read()
-                audio_placeholder.audio(audio_bytes, format="audio/mp3")
+            # Create a temporary file to store the audio
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as temp_file:
+                temp_filename = temp_file.name
+                
+                # Display an empty audio player immediately
+                audio_placeholder.audio(temp_filename, format="audio/mp3")
+                
+                # Stream and update audio in chunks
+                for audio_chunk in stream_audio_chunks(response):
+                    audio_chunk.export(temp_filename, format="mp3")
+                    audio_placeholder.audio(temp_filename, format="audio/mp3")
+            
+            # Clean up the temporary file
+            os.unlink(temp_filename)
         
         st.success("Audio generated and played successfully!")
     except requests.RequestException as e:
