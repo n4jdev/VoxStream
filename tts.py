@@ -52,7 +52,6 @@ def stream_audio(text):
 
 # Always display the audio player
 audio_player = st.empty()
-audio_player.audio("data:audio/mp3;base64,", format="audio/mp3")
 
 # Generate button
 if st.button("Generate Speech"):
@@ -70,9 +69,9 @@ if st.button("Generate Speech"):
             for chunk in audio_stream:
                 audio_data += chunk
                 
-                # Update the audio player with the current data
+                # Update the audio player with the current data and autoplay
                 audio_base64 = base64.b64encode(audio_data).decode()
-                audio_player.audio(f"data:audio/mp3;base64,{audio_base64}", format="audio/mp3")
+                audio_player.markdown(f'<audio src="data:audio/mp3;base64,{audio_base64}" controls autoplay>Your browser does not support the audio element.</audio>', unsafe_allow_html=True)
                 
                 # Update status message
                 elapsed_time = time.time() - start_time
