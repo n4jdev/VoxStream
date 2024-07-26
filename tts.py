@@ -1,38 +1,46 @@
 import streamlit as st
 import requests
+import json
+import base64
 import io
-from pydub import AudioSegment
-import tempfile
-import os
 
-# Streamlit app configuration
-st.set_page_config(page_title="StreamSpeak: Chunked TTS Audio Streamer", page_icon="🎙️")
+# Streamlit app title
+st.title("StreamSpeak: Real-time TTS App")
 
-# Constants
+# Text input
+text_input = st.text_area("Enter text to convert to speech:", "Hello, welcome to StreamSpeak!")
+
+# Voice selection (currently only Onyx is available)
+voice = st.selectbox("Select voice:", ["onyx"])
+
+# Language selection (currently only Filipino/Tagalog is available)
+language = st.selectbox("Select language:", ["tl"])
+
+# Speed slider
+speed = st.slider("Speech speed:", min_value=0.5, max_value=2.0, value=1.0, step=0.1)
+
+# API endpoint
 API_URL = "https://europe-west3-bubble-io-284016.cloudfunctions.net/get-stream"
-AUTH_TOKEN = "dc22c6f09ef2fa3d96a53b589ecc2b5a644db8fb24bbd21dac77370017fb792208e358d5df25bb1f2669304fb7bbd5f3f08119079044421acf8e0663667a573f03606155273cb02a2a62d9b310a5c2d49fef56b45c59ed6f4e06cc0b31e91f1ba96f364ab6f350ef30d3c4c7e88c09b44ed889ee2e3b09646c7855c3f43272d82a13ff0bbbd5a88b54dc312f60bfaa3a9931e10a47b4cbb8b4be78c687757ee6855d030f836622b9dc8e062dcccaa9601a96c52fe3528be876ed6ed4bc193e1448e96518569bcf98e509df22effed1ed1a405c29438fb3af307281d8416f84146244d7e9b8f58f5af35f6c5b8ee1c2ef5f3e271ec49849704b6d0272f3f709e550db9c3c158f3f18851a9d4cab008c87eac57c04f3d9d899ced500998d0d61e35b691642"
 
-# Helper function to stream audio in chunks
-def stream_audio_chunks(response):
-    buffer = io.BytesIO()
-    for chunk in response.iter_content(chunk_size=4096):
-        if chunk:
-            buffer.write(chunk)
-            buffer.seek(0)
-            yield AudioSegment.from_mp3(buffer)
-            buffer.seek(0)
-            buffer.truncate()
+# API headers
+headers = {
+    "User-Agent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36",
+    "Content-Type": "application/json",
+    "authority": "europe-west3-bubble-io-284016.cloudfunctions.net",
+    "accept-language": "en-PH,en-US;q=0.9,en;q=0.8",
+    "authorization": "Bearer dc22c6f09ef2fa3d96a53b589ecc2b5a644db8fb24bbd21dac77370017fb792208e358d5df25bb1f2669304fb7bbd5f3f08119079044421acf8e0663667a573f03606155273cb02a2a62d9b310a5c2d49fef56b45c59ed6f4e06cc0b31e91f1ba96f364ab6f350ef30d3c4c7e88c09b44ed889ee2e3b09646c7855c3f43272d82a13ff0bbbd5a88b54dc312f60bfaa3a9931e10a47b4cbb8b4be78c687757ee6855d030f836622b9dc8e062dcccaa9601a96c52fe3528be876ed6ed4bc193e1448e96518569bcf98e509df22effed1ed1a405c29438fb3af307281d8416f84146244d7e9b8f58f5af35f6c5b8ee1c2ef5f3e271ec49849704b6d0272f3f709e550db9c3c158f3f18851a9d4cab008c87eac57c04f3d9d899ced500998d0d61e35b691642",
+    "origin": "https://openaitexttospeechdemo.bubbleapps.io",
+    "referer": "https://openaitexttospeechdemo.bubbleapps.io/",
+    "sec-ch-ua": '"Not-A.Brand";v="99", "Chromium";v="124"',
+    "sec-ch-ua-mobile": "?1",
+    "sec-ch-ua-platform": '"Android"',
+    "sec-fetch-dest": "empty",
+    "sec-fetch-mode": "cors",
+    "sec-fetch-site": "cross-site",
+}
 
-# Function to generate and play audio using chunked transfer
-def generate_and_play_chunked_audio(text, voice, language, speed):
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36",
-        "Content-Type": "application/json",
-        "authorization": f"Bearer {AUTH_TOKEN}",
-        "origin": "https://openaitexttospeechdemo.bubbleapps.io",
-        "referer": "https://openaitexttospeechdemo.bubbleapps.io/"
-    }
-    
+# Function to stream audio
+def stream_audio(text):
     payload = {
         "model": "tts-1-hd",
         "input": text,
@@ -41,61 +49,57 @@ def generate_and_play_chunked_audio(text, voice, language, speed):
         "format": "mp3",
         "speed": speed
     }
-
-    try:
-        with requests.post(API_URL, headers=headers, json=payload, stream=True) as response:
-            response.raise_for_status()
-            
-            # Create a placeholder for the audio player
-            audio_placeholder = st.empty()
-            
-            # Create a temporary file to store the audio
-            with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as temp_file:
-                temp_filename = temp_file.name
-                
-                # Display an empty audio player immediately
-                audio_placeholder.audio(temp_filename, format="audio/mp3")
-                
-                # Stream and update audio in chunks
-                for audio_chunk in stream_audio_chunks(response):
-                    audio_chunk.export(temp_filename, format="mp3")
-                    audio_placeholder.audio(temp_filename, format="audio/mp3")
-            
-            # Clean up the temporary file
-            os.unlink(temp_filename)
-        
-        st.success("Audio generated and played successfully!")
-    except requests.RequestException as e:
-        st.error(f"An error occurred: {str(e)}")
-
-# Streamlit app
-def main():
-    st.title("StreamSpeak: Chunked TTS Audio Streamer")
-    st.write("Convert text to speech and listen with efficient chunked streaming!")
-
-    # Text input
-    text_input = st.text_area("Enter the text you want to convert to speech:", height=150)
-
-    # Voice selection
-    voice_options = ["onyx", "alloy", "echo", "fable", "nova", "shimmer"]
-    selected_voice = st.selectbox("Select a voice:", voice_options)
-
-    # Language selection
-    language_options = ["en", "es", "fr", "de", "it", "pt", "pl", "tr", "ru", "nl", "cs", "ar", "zh", "ja", "ko", "tl"]
-    selected_language = st.selectbox("Select a language:", language_options)
-
-    # Speed selection
-    speed = st.slider("Speech speed:", min_value=0.5, max_value=2.0, value=1.0, step=0.1)
-
-    # Generate and play button
-    if st.button("Generate and Play Audio"):
-        if text_input:
-            generate_and_play_chunked_audio(text_input, selected_voice, selected_language, speed)
+    
+    with requests.post(API_URL, headers=headers, json=payload, stream=True) as response:
+        if response.status_code == 200:
+            buffer = io.BytesIO()
+            for chunk in response.iter_content(chunk_size=4096):
+                if chunk:
+                    buffer.write(chunk)
+            buffer.seek(0)
+            return buffer
         else:
-            st.warning("Please enter some text to convert to speech.")
+            st.error(f"Error: {response.status_code} - {response.text}")
+            return None
 
-    st.markdown("---")
-    st.write("Note: This application uses AI-generated voices and chunked transfer encoding for efficient streaming.")
+# Generate button
+if st.button("Generate Speech"):
+    if text_input:
+        # Create a placeholder for the audio player
+        audio_placeholder = st.empty()
+        
+        # Stream the audio
+        audio_buffer = stream_audio(text_input)
+        
+        if audio_buffer:
+            # Convert audio buffer to base64
+            audio_base64 = base64.b64encode(audio_buffer.getvalue()).decode()
+            
+            # Display the audio player
+            audio_placeholder.audio(audio_buffer, format="audio/mp3")
+            
+            # Provide download link
+            st.download_button(
+                label="Download Audio",
+                data=audio_buffer,
+                file_name="generated_speech.mp3",
+                mime="audio/mp3"
+            )
+    else:
+        st.warning("Please enter some text to convert to speech.")
 
-if __name__ == "__main__":
-    main()
+# App instructions
+st.markdown("""
+## How to use StreamSpeak:
+1. Enter the text you want to convert to speech in the text area.
+2. Select the desired voice (currently only Onyx is available).
+3. Choose the language (currently only Filipino/Tagalog is supported).
+4. Adjust the speech speed using the slider.
+5. Click the "Generate Speech" button.
+6. The audio will start playing automatically as it's being generated.
+7. You can download the generated audio using the "Download Audio" button.
+""")
+
+# Footer
+st.markdown("---")
+st.markdown("StreamSpeak - Powered by Streamlit and Custom TTS API")
