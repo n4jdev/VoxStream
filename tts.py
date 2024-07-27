@@ -67,7 +67,7 @@ if st.button("Generate Speech"):
                 audio_player.audio(f"data:audio/mp3;base64,{audio_base64}", format="audio/mp3")
                 
                 # Add a small delay to allow for smoother updates
-                time.sleep(0.1)
+                time.sleep(0)
             
             # Provide download link
             st.download_button(
